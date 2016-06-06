@@ -40,6 +40,9 @@ func main() {
 	flag.StringVar(&followingOutputFileName, "following-output", "following.txt", "following output file name")
 	flag.StringVar(&tokensFileName, "tokens-file", "tokens.txt", "tokens file name")
 
+	flag.Parse()
+
+
 	tokens, err := readTokens(tokensFileName)
 	if err != nil {
 		log.Fatalln(err)
@@ -164,6 +167,11 @@ func getRateLimitResetTime(response *http.Response) *time.Time {
 
 func needRetry(result *octokit.Result, token string) bool {
 	if !result.HasError() {
+		rate := result.RateLimitRemaining()
+		if rate < 500+360 {
+			after := 10 * time.Second
+			<-time.After(after)
+		}
 		return false
 	}
 	rerr, ok := result.Err.(*octokit.ResponseError)
@@ -246,6 +254,7 @@ func fetchFollowersForUser(client *octokit.Client, link *octokit.Hyperlink, para
 
 func writeUserRelations(followersOutputFile *os.File, followingOutputFile *os.File, userRelationCh <-chan *UserRelation) {
 	for userRelation := range userRelationCh {
+		log.Println(userRelation.user)
 		writeRelation(followersOutputFile, userRelation.user, userRelation.followers)
 		writeRelation(followingOutputFile, userRelation.user, userRelation.following)
 
